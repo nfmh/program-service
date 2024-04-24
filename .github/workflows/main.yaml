@@ -1,0 +1,86 @@
+name: build and deploy
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  PROJECT_ID: metal-being-420005
+  REGION: europe-west3
+  REGISTRY_NAME: europe-west3-docker.pkg.dev/metal-being-420005/nfmh
+  IMAGE_NAME: program-service
+  IMAGE_TAG: test
+
+jobs:
+  build:
+    permissions:
+      contents: read # for actions/checkout to fetch code
+      security-events: write # for github/codeql-action/upload-sarif to upload SARIF results
+      actions: read
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0  # Disable shallow clone
+
+      - name: Set up JDK
+        uses: actions/setup-java@v2
+        with:
+          java-version: 17
+          distribution: 'adopt'
+
+      - name: Generate JaCoCo Coverage Report
+        run: ./mvnw clean verify jacoco:report
+
+      - name: Run Maven build process
+        run: ./mvnw clean package  # or ./mvnw clean install if needed
+
+      - name: Analyze with SonarCloud
+        run: ./mvnw sonar:sonar -Dsonar.projectKey=nfmh_program-service -Dsonar.organization=nfmh -Dsonar.host.url=https://sonarcloud.io -Dsonar.token=$SONAR_TOKEN
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Set up Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@v0.2.0
+        with:
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          project_id: ${{ env.PROJECT_ID }}
+          export_default_credentials: true
+
+      - name: Log in to Google Cloud Artifact Registry
+        run: gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin "europe-west3-docker.pkg.dev"
+
+      - name: Set DateTime as IMAGE_TAG
+        id: datetime
+        run: echo "::set-output name=DATETIME::$(date '+%Y%m%d%H%M%S')"
+
+      # Build Docker image
+      - name: Build Docker image
+        id: build-image
+        run: |
+         IMAGE_TAG=${{ env.IMAGE_TAG }}.$(date '+%Y%m%d%H%M%S')
+         docker build -t "${REGISTRY_NAME}/${IMAGE_NAME}:${IMAGE_TAG}" -f Dockerfile .
+         echo "::set-output name=IMAGE_NAME::${REGISTRY_NAME}/${IMAGE_NAME}:${IMAGE_TAG}"
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@7b7aa264d83dc58691451798b4d117d53d21edfe
+        continue-on-error: false
+        with:
+          image-ref: '${{ steps.build-image.outputs.IMAGE_NAME }}'
+          format: 'template'
+          template: '@/contrib/sarif.tpl'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      # Publish the Docker Image to GCP
+      - name: Push Docker image to Artifact registry
+        run: |
+          docker push "${{ steps.build-image.outputs.IMAGE_NAME }}"
+
