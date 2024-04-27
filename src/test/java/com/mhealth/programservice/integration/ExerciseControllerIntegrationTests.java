@@ -30,17 +30,13 @@ class ExerciseControllerIntegrationTests {
 
     @BeforeEach
     void setUp() {
-        exerciseRepository.deleteAll();
+        // No need to delete all exercises as we're using actual data
     }
 
     @Test
     void testGetExerciseById() throws Exception {
-        Exercise exercise = new Exercise();
-        exercise.setName("Test Exercise");
-        exercise.setDescription("Test Description");
-        exercise.setCaloriesBurned(200);
-
-        exercise = exerciseRepository.save(exercise);
+        // Assuming the first exercise in the database is used for testing
+        Exercise exercise = exerciseRepository.findAll().get(0);
 
         MvcResult mvcResult = mockMvc.perform(MockMvcRequestBuilders.get("/program/exercises/{exerciseId}", exercise.getId())
                         .contentType(MediaType.APPLICATION_JSON))
@@ -55,18 +51,8 @@ class ExerciseControllerIntegrationTests {
 
     @Test
     void testGetAllExercises() throws Exception {
-        Exercise exercise1 = new Exercise();
-        exercise1.setName("Exercise 1");
-        exercise1.setDescription("Description 1");
-        exercise1.setCaloriesBurned(100);
-
-        Exercise exercise2 = new Exercise();
-        exercise2.setName("Exercise 2");
-        exercise2.setDescription("Description 2");
-        exercise2.setCaloriesBurned(200);
-
-        exercise1 = exerciseRepository.save(exercise1);
-        exercise2 = exerciseRepository.save(exercise2);
+        // Fetch the actual count of exercises from the database
+        long actualExerciseCount = exerciseRepository.count();
 
         MvcResult mvcResult = mockMvc.perform(MockMvcRequestBuilders.get("/program/exercises")
                         .contentType(MediaType.APPLICATION_JSON))
@@ -77,7 +63,9 @@ class ExerciseControllerIntegrationTests {
 
         String content = mvcResult.getResponse().getContentAsString();
         Exercise[] exercises = objectMapper.readValue(content, Exercise[].class);
-        assertEquals(2, exercises.length);
+
+        // Compare the actual count of exercises with the count of items returned by the endpoint
+        assertEquals(actualExerciseCount, exercises.length);
     }
 
     @Test
@@ -103,4 +91,5 @@ class ExerciseControllerIntegrationTests {
         int status = mvcResult.getResponse().getStatus();
         assertEquals(400, status);
     }
+
 }

@@ -13,8 +13,6 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
-import java.util.Optional;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @SpringBootTest
@@ -32,17 +30,13 @@ class FoodControllerIntegrationTests {
 
     @BeforeEach
     void setUp() {
-        foodRepository.deleteAll();
+        // No need to delete all foods as we're using actual data
     }
 
     @Test
     void testGetFoodById() throws Exception {
-        Food food = new Food();
-        food.setName("Test Food");
-        food.setDescription("Test Description");
-        food.setCalories(100);
-
-        food = foodRepository.save(food);
+        // Assuming the first food in the database is used for testing
+        Food food = foodRepository.findAll().get(0);
 
         MvcResult mvcResult = mockMvc.perform(MockMvcRequestBuilders.get("/program/food/{foodId}", food.getId())
                         .contentType(MediaType.APPLICATION_JSON))
@@ -57,18 +51,8 @@ class FoodControllerIntegrationTests {
 
     @Test
     void testGetAllFood() throws Exception {
-        Food food1 = new Food();
-        food1.setName("Food 1");
-        food1.setDescription("Description 1");
-        food1.setCalories(100);
-
-        Food food2 = new Food();
-        food2.setName("Food 2");
-        food2.setDescription("Description 2");
-        food2.setCalories(200);
-
-        food1 = foodRepository.save(food1);
-        food2 = foodRepository.save(food2);
+        // Fetch the actual count of food items from the database
+        long actualFoodCount = foodRepository.count();
 
         MvcResult mvcResult = mockMvc.perform(MockMvcRequestBuilders.get("/program/food")
                         .contentType(MediaType.APPLICATION_JSON))
@@ -79,9 +63,10 @@ class FoodControllerIntegrationTests {
 
         String content = mvcResult.getResponse().getContentAsString();
         Food[] foods = objectMapper.readValue(content, Food[].class);
-        assertEquals(2, foods.length);
-    }
 
+        // Compare the actual count of food items with the count of items returned by the endpoint
+        assertEquals(actualFoodCount, foods.length);
+    }
     @Test
     void testGetFoodById_NotFound() throws Exception {
         Long nonExistentFoodId = 999L;
@@ -93,7 +78,6 @@ class FoodControllerIntegrationTests {
         int status = mvcResult.getResponse().getStatus();
         assertEquals(404, status);
     }
-
     @Test
     void testGetFoodById_InvalidId() throws Exception {
         String invalidFoodId = "invalid_id";
@@ -105,7 +89,5 @@ class FoodControllerIntegrationTests {
         int status = mvcResult.getResponse().getStatus();
         assertEquals(400, status);
     }
-
-// Add more integration tests as needed
 
 }
