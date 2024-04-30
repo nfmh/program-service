@@ -8,7 +8,7 @@ RUN groupadd -r user && useradd -r -g user user
 WORKDIR /app
 
 # Copy the packaged JAR file into the container
-COPY target/user-service-0.0.1-SNAPSHOT.jar /app/program-service.jar
+COPY target/program-service-0.0.1-SNAPSHOT.jar /app/program-service.jar
 
 # Change ownership of the application files to the non-root user
 RUN chown user:user /app/program-service.jar
